@@ -1,0 +1,196 @@
+
+1.
+import pandas as pd
+import numpy as np
+import datetime as dt
+import os
+import warnings
+from collections import UserDict
+from glob import glob
+import matplotlib.pyplot as plt
+from IPython.display import Image
+%matplotlib inline
+import matplotlib.dates as mpl_dates
+import seaborn as sns
+from statsmodels.tsa.ar_model import AutoReg, ar_select_order
+from statsmodels.tsa.api import acf, pacf, graphics
+from statsmodels.tsa.statespace.sarimax import SARIMAX
+from sklearn.preprocessing import MinMaxScaler
+import math
+from keras.models import Model, Sequential
+from keras.layers import GRU, Dense
+from keras.callbacks import EarlyStopping
+
+2.
+import plotly.graph_objects as go
+
+3.
+from google.colab import drive
+drive.mount('/content/drive')
+
+
+4.
+ADANIPORTS = pd.read_csv ('/content/drive/MyDrive/MINI Project/ADANIPORTS.csv')
+ADANIPORTS.head (10000)
+
+
+5.
+TSLA= pd.read_csv ('/content/drive/MyDrive/MINI Project/TSLA.csv')
+TSLA.head (10000)
+
+
+
+6.
+import statsmodels.api as sm
+def seasonal_decompose (y):
+    decomposition = sm.tsa.seasonal_decompose(y, model='additive',extrapolate_trend='freq')
+    fig = decomposition.plot()
+    fig.set_size_inches(14,7)
+    plt.show()
+    seasonal_decompose(y)
+
+7.
+def test_stationarity(timeseries, title):
+    #Determing rolling statistics
+    rolmean = pd.Series(timeseries).rolling(window=3).mean()
+    rolstd = pd.Series(timeseries).rolling(window=3).std()
+    y=timeseries
+    fig, ax = plt.subplots(figsize=(16, 4))
+    ax.plot(timeseries, label= title)
+    ax.plot(rolmean, label='rolling mean')
+    ax.plot(rolstd, label='rolling standard deviation')
+    ax.legend(loc='best')
+    ax.set_title(title)
+    plt.show()
+
+
+
+8.
+from statsmodels.tsa.stattools import adfuller
+
+def ADF_test(timeseries, dataDesc):
+    print(' > Is the {} stationary ?'.format(dataDesc))
+    dftest = adfuller(timeseries.dropna(), autolag='AIC')
+    print('Test statistic = {:.3f}'.format(dftest[0]))
+    print('P-value = {:.3f}'.format(dftest[1]))
+    print('Critical values :')
+    for k, v in dftest[4].items():
+        print('\t{}: {} - The data is {} stationary with {}% confidence'.format(k, v, 'not' if v<dftest[0] else '', 100-int(k[:-1])))
+
+
+
+
+9.
+df=pd.read_csv('/content/drive/MyDrive/MINI Project/ADANIPORTS.csv')[-200:]
+df.set_index(pd.DatetimeIndex(df['Date'].values))
+
+
+
+10.
+fig = go.Figure(data=[go.Candlestick(x=df['Date'],open=df['Open'],high=df['High'],low=df['Low'],close=df['Close'])])
+fig.show()
+
+
+
+11.
+df=pd.read_csv('/content/drive/MyDrive/MINI Project/TSLA.csv')[-200:]
+df
+df.set_index(pd.DatetimeIndex(df['Date'].values))
+
+
+
+12.
+fig = go.Figure(data=[go.Candlestick(x=df['Date'],open=df['Open'],high=df['High'],low=df['Low'],close=df['Close'])])
+fig.show()
+
+
+
+
+13.
+pd.options.display.float_format = '{:.8f}'.format
+test_stationarity(df['Open'], 'raw data')
+
+
+
+14.
+pd.options.display.float_format = '{:.8f}'.format
+test_stationarity(df['Close'], 'raw data')
+
+
+
+15.
+pd.options.display.float_format = '{:.8f}'.format
+test_stationarity(df['Volume'], 'raw data')
+
+
+
+16.
+pd.options.display.float_format = '{:.8f}'.format
+test_stationarity(df['High'], 'raw data')
+
+
+17.
+pd.options.display.float_format = '{:.8f}'.format
+test_stationarity(df['Low'], 'raw data')
+
+
+18.
+ADF_test(df['Volume'],'raw data')
+
+
+19.
+ADF_test(df['Low'],'raw data')
+
+
+20.
+ADF_test(df['High'],'raw data')
+
+
+21.
+ADF_test(df['Open'],'raw data')
+
+22.
+ADF_test(df['Close'],'raw data')
+
+
+23.
+y = df['Open']
+y_detrend =  (y - y.rolling(window=12).mean())/y.rolling(window=12).std()
+
+test_stationarity(y_detrend,'de-trended data')
+ADF_test(y_detrend,'de-trended data')
+
+
+24.
+y_12lag =  y - y.shift(12)
+
+test_stationarity(y_12lag,'12 lag differenced data')
+ADF_test(y_12lag,'12 lag differenced data')
+
+
+25.
+y_12lag_detrend =  y_detrend - y_detrend.shift(12)
+
+test_stationarity(y_12lag_detrend,'12 lag differenced de-trended data')
+ADF_test(y_12lag_detrend,'12 lag differenced de-trended data')
+
+
+
+26.
+from datetime import datetime
+
+# Convert the string index to a datetime object
+date_index = datetime(2007, 11, 27)
+# Define the training dataset
+ADANIPORTS_to_train = ADANIPORTS[:datetime(2020,1,31,10,10)]
+
+# Print the training dataset
+print(ADANIPORTS_to_train)
+print(ADANIPORTS_to_train)
+
+
+27.
+ADANIPORTS_to_train =ADANIPORTS[:'2007-11-27'] # dataset to train
+ADANIPORTS_to_val = ADANIPORTS['2021-04-26':] # last X months for test
+predict_date = len(ADANIPORTS) - len(ADANIPORTS[:'2023-09-03']) # the number of data points for the test set
+
